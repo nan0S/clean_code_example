@@ -11,7 +11,7 @@ u64 EndTimeMeasurement(timestamp BeginTs)
 {
    timestamp EndTs;
    clock_gettime(CLOCK_MONOTONIC_RAW, &EndTs);
-   
+
    u64 DiffSec = EndTs.tv_sec - BeginTs.tv_sec;
    u64 DiffNsec;
    if (EndTs.tv_nsec >= BeginTs.tv_nsec)
@@ -24,6 +24,6 @@ u64 EndTimeMeasurement(timestamp BeginTs)
       DiffNsec = (1000000000 + EndTs.tv_nsec) - BeginTs.tv_nsec;
    }
    DiffNsec += DiffSec * 1000000000;
-   
-   return DiffNSec;
+
+   return DiffNsec;
 }
