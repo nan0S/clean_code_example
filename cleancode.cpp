@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 #include <math.h>
 
 typedef float f32;
@@ -10,6 +9,26 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 #define Pi32 3.14159265359f
+
+//- OS recognition
+#if defined(_WIN32)
+#define OS_WINDOWS 1
+#elif defined (__gnu_linux__)
+#define OS_LINUX 1
+#elif defined (__APPLE__) && defined(__MACM__)
+#define OS_MAC 1
+#else
+#error missing OS detection
+#endif)
+
+//- High precision OS measurement implementations
+#if OS_WINDOWS
+#include "cleancode_windows.cpp"
+#elif OS_LINUX
+#include "cleancode_linux.cpp"
+#else
+#error missing OS implementation
+#endif
 
 class shape_base
 {
@@ -254,28 +273,17 @@ f32 MeasureVTBL(f32 (*Function)(u32, shape_base **),
          }
       }
       
-      timespec BeginTs, EndTs;
-      clock_gettime(CLOCK_MONOTONIC_RAW, &BeginTs);
+      timestamp BeginTs;
+      BeginTimeMeasurement(&BeginTs);
+      
       for (u32 RepeatIndex = 0; RepeatIndex < RepeatCount; ++RepeatIndex)
       {
          f32 TotalArea = Function(ShapeCount, Shapes);
       }
-      clock_gettime(CLOCK_MONOTONIC_RAW, &EndTs);
       
-      u64 DiffSec = EndTs.tv_sec - BeginTs.tv_sec;
-      u64 DiffNsec;
-      if (EndTs.tv_nsec >= BeginTs.tv_nsec)
-      {
-         DiffNsec = EndTs.tv_nsec - BeginTs.tv_nsec;
-      }
-      else
-      {
-         DiffSec -= 1;
-         DiffNsec = (1000000000 + EndTs.tv_nsec) - BeginTs.tv_nsec;
-      }
-      DiffNsec += DiffSec * 1000000000;
+      u64 MeasurementNSec = EndTimeMeasurement(BeginTs);
       
-      f32 Measurement = (f32)DiffNsec / (RepeatCount * ShapeCount);
+      f32 Measurement = (f32)MeasurementNSec / (RepeatCount * ShapeCount);
       if (Measurement < BestMeasurement)
       {
          BestMeasurement = Measurement;
@@ -316,29 +324,18 @@ f32 MeasureUnion(f32 (*Function)(u32, shape_union *),
          Shapes[ShapeIndex] = Shape;
       }
       
-      timespec BeginTs, EndTs;
-      clock_gettime(CLOCK_MONOTONIC_RAW, &BeginTs);
+      timestamp BeginTs;
+      BeginTimeMeasurement(&BeginTs);
+      
       for (u32 RepeatIndex = 0; RepeatIndex < RepeatCount; ++RepeatIndex)
       {
          f32 TotalArea = Function(ShapeCount, Shapes);
          TotalAreaAccum += TotalArea;
       }
-      clock_gettime(CLOCK_MONOTONIC_RAW, &EndTs);
       
-      u64 DiffSec = EndTs.tv_sec - BeginTs.tv_sec;
-      u64 DiffNsec;
-      if (EndTs.tv_nsec >= BeginTs.tv_nsec)
-      {
-         DiffNsec = EndTs.tv_nsec - BeginTs.tv_nsec;
-      }
-      else
-      {
-         DiffSec -= 1;
-         DiffNsec = (1000000000 + EndTs.tv_nsec) - BeginTs.tv_nsec;
-      }
-      DiffNsec += DiffSec * 1000000000;
+      u64 MeasurementNSec = EndTimeMeasurement(BeginTs);
       
-      f32 Measurement = (f32)DiffNsec / (RepeatCount * ShapeCount);
+      f32 Measurement = (f32)MeasurementNSec / (RepeatCount * ShapeCount);
       if (Measurement < BestMeasurement)
       {
          BestMeasurement = Measurement;
