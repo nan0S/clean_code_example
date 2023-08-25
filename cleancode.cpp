@@ -9,6 +9,7 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 #define Pi32 3.14159265359f
+#define ArrayCount(Array) (sizeof((Array)) / sizeof((Array)[0]))
 
 //- OS recognition
 #if defined(_WIN32)
@@ -24,6 +25,10 @@ typedef uint64_t u64;
 //- High precision OS measurement implementations
 #if OS_WINDOWS
 #include "cleancode_windows.cpp"
+
+#include <xmmintrin.h>
+#include <immintrin.h>
+
 #elif OS_LINUX
 #include "cleancode_linux.cpp"
 #else
@@ -252,6 +257,224 @@ f32 CornerAreaTable4(u32 ShapeCount, shape_union *Shapes)
    return Result;
 }
 
+__m128 GetCornerAreaTableSIMD(shape_union *BaseShape)
+{
+   __m128 Multiplier = _mm_set_ps(CTable[BaseShape->Type],
+                                  CTable[(BaseShape + 1)->Type],
+                                  CTable[(BaseShape + 2)->Type],
+                                  CTable[(BaseShape + 3)->Type]);
+   
+   __m128 Width = _mm_set_ps(BaseShape->Width,
+                             (BaseShape + 1)->Width,
+                             (BaseShape + 2)->Width,
+                             (BaseShape + 3)->Width);
+   
+   __m128 Height = _mm_set_ps(BaseShape->Height,
+                              (BaseShape + 1)->Height,
+                              (BaseShape + 2)->Height,
+                              (BaseShape + 3)->Height);
+   
+   __m128 Result = _mm_mul_ps(Multiplier, _mm_mul_ps(Width, Height));
+   
+   return Result;
+}
+
+f32 SumUpSIMDVector(__m128 V)
+{
+   f32 C[4];
+   _mm_storeu_ps(C, V);
+   f32 Result = (C[0] + C[1]) + (C[2] + C[3]);
+   
+   return Result;
+}
+
+f32 CornerAreaTableSIMD(u32 ShapeCount, shape_union *Shapes)
+{
+   __m128 Accum = _mm_set1_ps(0.0f);
+   
+   u32 Count = ShapeCount/4;
+   while (Count--)
+   {
+      Accum = _mm_add_ps(Accum, GetCornerAreaTableSIMD(Shapes));
+      Shapes += 4;
+   }
+   
+   f32 Result = SumUpSIMDVector(Accum);
+   
+   return Result;
+}
+
+f32 CornerAreaTableSIMD2(u32 ShapeCount, shape_union *Shapes)
+{
+   __m128 Accum0 = _mm_set1_ps(0.0f);
+   __m128 Accum1 = _mm_set1_ps(0.0f);
+   
+   u32 Count = ShapeCount/8;
+   while (Count--)
+   {
+      __m128 Current0 = GetCornerAreaTableSIMD(Shapes);
+      __m128 Current1 = GetCornerAreaTableSIMD(Shapes + 4);
+      
+      Accum0 = _mm_add_ps(Accum0, Current0);
+      Accum1 = _mm_add_ps(Accum1, Current1);
+      
+      Shapes += 8;
+   }
+   
+   f32 Result0 = SumUpSIMDVector(Accum0);
+   f32 Result1 = SumUpSIMDVector(Accum1);
+   f32 Result = Result0 + Result1;
+   
+   return Result;
+}
+
+f32 CornerAreaTableSIMD4(u32 ShapeCount, shape_union *Shapes)
+{
+   __m128 Accum0 = _mm_set1_ps(0.0f);
+   __m128 Accum1 = _mm_set1_ps(0.0f);
+   __m128 Accum2 = _mm_set1_ps(0.0f);
+   __m128 Accum3 = _mm_set1_ps(0.0f);
+   
+   u32 Count = ShapeCount/16;
+   while (Count--)
+   {
+      __m128 Current0 = GetCornerAreaTableSIMD(Shapes);
+      __m128 Current1 = GetCornerAreaTableSIMD(Shapes + 4);
+      __m128 Current2 = GetCornerAreaTableSIMD(Shapes + 8);
+      __m128 Current3 = GetCornerAreaTableSIMD(Shapes + 12);
+      
+      Accum0 = _mm_add_ps(Accum0, Current0);
+      Accum1 = _mm_add_ps(Accum1, Current1);
+      Accum2 = _mm_add_ps(Accum2, Current2);
+      Accum3 = _mm_add_ps(Accum3, Current3);
+      
+      Shapes += 16;
+   }
+   
+   f32 Result0 = SumUpSIMDVector(Accum0);
+   f32 Result1 = SumUpSIMDVector(Accum1);
+   f32 Result2 = SumUpSIMDVector(Accum2);
+   f32 Result3 = SumUpSIMDVector(Accum3);
+   f32 Result = (Result0 + Result1) + (Result2 + Result3);
+   
+   return Result;
+}
+
+__m256 GetCornerAreaTableSIMD256(shape_union *BaseShape)
+{
+   __m256 Multiplier = _mm256_set_ps(CTable[BaseShape->Type],
+                                     CTable[(BaseShape + 1)->Type],
+                                     CTable[(BaseShape + 2)->Type],
+                                     CTable[(BaseShape + 3)->Type],
+                                     CTable[(BaseShape + 4)->Type],
+                                     CTable[(BaseShape + 5)->Type],
+                                     CTable[(BaseShape + 6)->Type],
+                                     CTable[(BaseShape + 7)->Type]);
+   
+   __m256 Width = _mm256_set_ps(BaseShape->Width,
+                                (BaseShape + 1)->Width,
+                                (BaseShape + 2)->Width,
+                                (BaseShape + 3)->Width,
+                                (BaseShape + 4)->Width,
+                                (BaseShape + 5)->Width,
+                                (BaseShape + 6)->Width,
+                                (BaseShape + 7)->Width);
+   
+   __m256 Height = _mm256_set_ps(BaseShape->Height,
+                                 (BaseShape + 1)->Height,
+                                 (BaseShape + 2)->Height,
+                                 (BaseShape + 3)->Height,
+                                 (BaseShape + 4)->Height,
+                                 (BaseShape + 5)->Height,
+                                 (BaseShape + 6)->Height,
+                                 (BaseShape + 7)->Height);
+   
+   __m256 Result = _mm256_mul_ps(Multiplier, _mm256_mul_ps(Width, Height));
+   
+   return Result;
+}
+
+f32 SumUpSIMD256Vector(__m256 V)
+{
+   f32 C[8];
+   _mm256_storeu_ps(C, V);
+   f32 Result = ((C[0] + C[1]) + (C[2] + C[3])) + ((C[4] + C[5]) + (C[6] + C[7]));
+   
+   return Result;
+}
+
+f32 CornerAreaTableSIMD256(u32 ShapeCount, shape_union *Shapes)
+{
+   __m256 Accum = _mm256_set1_ps(0.0f);
+   
+   u32 Count = ShapeCount/8;
+   while (Count--)
+   {
+      Accum = _mm256_add_ps(Accum, GetCornerAreaTableSIMD256(Shapes));
+      Shapes += 8;
+   }
+   
+   f32 Result = SumUpSIMD256Vector(Accum);
+   
+   return Result;
+}
+
+f32 CornerAreaTableSIMD256_2(u32 ShapeCount, shape_union *Shapes)
+{
+   __m256 Accum0 = _mm256_set1_ps(0.0f);
+   __m256 Accum1 = _mm256_set1_ps(0.0f);
+   
+   u32 Count = ShapeCount/16;
+   while (Count--)
+   {
+      __m256 Current0 = GetCornerAreaTableSIMD256(Shapes);
+      __m256 Current1 = GetCornerAreaTableSIMD256(Shapes + 8);
+      
+      Accum0 = _mm256_add_ps(Accum0, Current0);
+      Accum1 = _mm256_add_ps(Accum1, Current1);
+      
+      Shapes += 16;
+   }
+   
+   f32 Result0 = SumUpSIMD256Vector(Accum0);
+   f32 Result1 = SumUpSIMD256Vector(Accum1);
+   f32 Result = Result0 + Result1;
+   
+   return Result;
+}
+
+f32 CornerAreaTableSIMD256_4(u32 ShapeCount, shape_union *Shapes)
+{
+   __m256 Accum0 = _mm256_set1_ps(0.0f);
+   __m256 Accum1 = _mm256_set1_ps(0.0f);
+   __m256 Accum2 = _mm256_set1_ps(0.0f);
+   __m256 Accum3 = _mm256_set1_ps(0.0f);
+   
+   u32 Count = ShapeCount/32;
+   while (Count--)
+   {
+      __m256 Current0 = GetCornerAreaTableSIMD256(Shapes);
+      __m256 Current1 = GetCornerAreaTableSIMD256(Shapes + 8);
+      __m256 Current2 = GetCornerAreaTableSIMD256(Shapes + 16);
+      __m256 Current3 = GetCornerAreaTableSIMD256(Shapes + 24);
+      
+      Accum0 = _mm256_add_ps(Accum0, Current0);
+      Accum1 = _mm256_add_ps(Accum1, Current1);
+      Accum2 = _mm256_add_ps(Accum2, Current2);
+      Accum3 = _mm256_add_ps(Accum3, Current3);
+      
+      Shapes += 32;
+   }
+   
+   f32 Result0 = SumUpSIMD256Vector(Accum0);
+   f32 Result1 = SumUpSIMD256Vector(Accum1);
+   f32 Result2 = SumUpSIMD256Vector(Accum2);
+   f32 Result3 = SumUpSIMD256Vector(Accum3);
+   f32 Result = (Result0 + Result1) + (Result2 + Result3);
+   
+   return Result;
+}
+
 f32 MeasureVTBL(f32 (*Function)(u32, shape_base **),
                 u32 ShapeCount, u32 MeasurementsPerTest, u32 RepeatCount)
 {
@@ -358,29 +581,53 @@ void Measure(u32 RepeatCount)
    u32 ShapeCount = 1048576;
    u32 MeasurementsPerTest = 10;
    
-   printf("%20s(%d): ", "CornerAreaVTBL", ShapeCount); fflush(stdout);
+   printf("%30s(%d): ", "CornerAreaVTBL", ShapeCount); fflush(stdout);
    f32 MeasurementVTBL = MeasureVTBL(&CornerAreaVTBL, ShapeCount, MeasurementsPerTest, RepeatCount);
    printf("%f ns/shape\n", MeasurementVTBL);
    
-   printf("%20s(%d): ", "CornerAreaVTBL4", ShapeCount); fflush(stdout);
+   printf("%30s(%d): ", "CornerAreaVTBL4", ShapeCount); fflush(stdout);
    f32 MeasurementVTBL4 = MeasureVTBL(&CornerAreaVTBL4, ShapeCount, MeasurementsPerTest, RepeatCount);
    printf("%f ns/shape\n", MeasurementVTBL4);
    
-   printf("%20s(%d): ", "CornerAreaSwitch", ShapeCount); fflush(stdout);
+   printf("%30s(%d): ", "CornerAreaSwitch", ShapeCount); fflush(stdout);
    f32 MeasurementSwitch = MeasureUnion(&CornerAreaSwitch, ShapeCount, MeasurementsPerTest, RepeatCount);
    printf("%f ns/shape\n", MeasurementSwitch);
    
-   printf("%20s(%d): ", "CornerAreaSwitch4", ShapeCount); fflush(stdout);
+   printf("%30s(%d): ", "CornerAreaSwitch4", ShapeCount); fflush(stdout);
    f32 MeasurementSwitch4 = MeasureUnion(&CornerAreaSwitch4, ShapeCount, MeasurementsPerTest, RepeatCount);
    printf("%f ns/shape\n", MeasurementSwitch4);
    
-   printf("%20s(%d): ", "CornerAreaTable", ShapeCount); fflush(stdout);
+   printf("%30s(%d): ", "CornerAreaTable", ShapeCount); fflush(stdout);
    f32 MeasurementTable = MeasureUnion(&CornerAreaTable, ShapeCount, MeasurementsPerTest, RepeatCount);
    printf("%f ns/shape\n", MeasurementTable);
    
-   printf("%20s(%d): ", "CornerAreaTable4", ShapeCount); fflush(stdout);
+   printf("%30s(%d): ", "CornerAreaTable4", ShapeCount); fflush(stdout);
    f32 MeasurementTable4 = MeasureUnion(&CornerAreaTable4, ShapeCount, MeasurementsPerTest, RepeatCount);
    printf("%f ns/shape\n", MeasurementTable4);
+   
+   printf("%30s(%d): ", "CornerAreaTableSIMD", ShapeCount); fflush(stdout);
+   f32 MeasurementSIMD = MeasureUnion(&CornerAreaTableSIMD, ShapeCount, MeasurementsPerTest, RepeatCount);
+   printf("%f ns/shape\n", MeasurementSIMD);
+   
+   printf("%30s(%d): ", "CornerAreaTableSIMD2", ShapeCount); fflush(stdout);
+   f32 MeasurementSIMD2 = MeasureUnion(&CornerAreaTableSIMD2, ShapeCount, MeasurementsPerTest, RepeatCount);
+   printf("%f ns/shape\n", MeasurementSIMD2);
+   
+   printf("%30s(%d): ", "CornerAreaTableSIMD4", ShapeCount); fflush(stdout);
+   f32 MeasurementSIMD4 = MeasureUnion(&CornerAreaTableSIMD4, ShapeCount, MeasurementsPerTest, RepeatCount);
+   printf("%f ns/shape\n", MeasurementSIMD4);
+   
+   printf("%30s(%d): ", "CornerAreaTableSIMD256", ShapeCount); fflush(stdout);
+   f32 MeasurementSIMD256 = MeasureUnion(&CornerAreaTableSIMD256, ShapeCount, MeasurementsPerTest, RepeatCount);
+   printf("%f ns/shape\n", MeasurementSIMD256);
+   
+   printf("%30s(%d): ", "CornerAreaTableSIMD256_2", ShapeCount); fflush(stdout);
+   f32 MeasurementSIMD256_2 = MeasureUnion(&CornerAreaTableSIMD256_2, ShapeCount, MeasurementsPerTest, RepeatCount);
+   printf("%f ns/shape\n", MeasurementSIMD256_2);
+   
+   printf("%30s(%d): ", "CornerAreaTableSIMD256_4", ShapeCount); fflush(stdout);
+   f32 MeasurementSIMD256_4 = MeasureUnion(&CornerAreaTableSIMD256_4, ShapeCount, MeasurementsPerTest, RepeatCount);
+   printf("%f ns/shape\n", MeasurementSIMD256_4);
    
    printf("\n");
    
@@ -390,13 +637,25 @@ void Measure(u32 RepeatCount)
    f32 SpeedupSwitch4 = MeasurementVTBL / MeasurementSwitch4;
    f32 SpeedupTable = MeasurementVTBL / MeasurementTable;
    f32 SpeedupTable4 = MeasurementVTBL / MeasurementTable4;
+   f32 SpeedupSIMD = MeasurementVTBL / MeasurementSIMD;
+   f32 SpeedupSIMD2 = MeasurementVTBL / MeasurementSIMD2;
+   f32 SpeedupSIMD4 = MeasurementVTBL / MeasurementSIMD4;
+   f32 SpeedupSIMD256 = MeasurementVTBL / MeasurementSIMD256;
+   f32 SpeedupSIMD256_2 = MeasurementVTBL / MeasurementSIMD256_2;
+   f32 SpeedupSIMD256_4 = MeasurementVTBL / MeasurementSIMD256_4;
    
-   printf("%20s: %fx\n", "CornerAreaVTBL", SpeedupVTBL);
-   printf("%20s: %fx\n", "CornerAreaVTBL4", SpeedupVTBL4);
-   printf("%20s: %fx\n", "CornerAreaSwitch", SpeedupSwitch);
-   printf("%20s: %fx\n", "CornerAreaSwitch4", SpeedupSwitch4);
-   printf("%20s: %fx\n", "CornerAreaTable", SpeedupTable);
-   printf("%20s: %fx\n", "CornerAreaTable4", SpeedupTable4);
+   printf("%30s: %fx\n", "CornerAreaVTBL", SpeedupVTBL);
+   printf("%30s: %fx\n", "CornerAreaVTBL4", SpeedupVTBL4);
+   printf("%30s: %fx\n", "CornerAreaSwitch", SpeedupSwitch);
+   printf("%30s: %fx\n", "CornerAreaSwitch4", SpeedupSwitch4);
+   printf("%30s: %fx\n", "CornerAreaTable", SpeedupTable);
+   printf("%30s: %fx\n", "CornerAreaTable4", SpeedupTable4);
+   printf("%30s: %fx\n", "CornerAreaTableSIMD", SpeedupSIMD);
+   printf("%30s: %fx\n", "CornerAreaTableSIMD2", SpeedupSIMD2);
+   printf("%30s: %fx\n", "CornerAreaTableSIMD4", SpeedupSIMD4);
+   printf("%30s: %fx\n", "CornerAreaTableSIMD256", SpeedupSIMD256);
+   printf("%30s: %fx\n", "CornerAreaTableSIMD256_2", SpeedupSIMD256_2);
+   printf("%30s: %fx\n", "CornerAreaTableSIMD256_4", SpeedupSIMD256_4);
    
    printf("\n");
 }
@@ -405,8 +664,51 @@ int main()
 {
    srand(123123210);
    
+#if 1
+   
    Measure(1);
-   Measure(1000);
+   Measure(100);
+   
+#else
+   
+   u32 ShapeCount = 256;
+   shape_union *Shapes = (shape_union *)malloc(ShapeCount * sizeof(Shapes[0]));
+   
+   shape_union ShapeTemplates[4];
+   
+   ShapeTemplates[0].Type = Shape_Square;
+   ShapeTemplates[0].Width = ShapeTemplates[0].Height = 2.0f;
+   
+   ShapeTemplates[1].Type = Shape_Rectangle;
+   ShapeTemplates[1].Width = 3.0f;
+   ShapeTemplates[1].Height = 2.0f;
+   
+   ShapeTemplates[2].Type = Shape_Triangle;
+   ShapeTemplates[2].Width = 1.0f;
+   ShapeTemplates[2].Height = 2.0f;
+   
+   ShapeTemplates[3].Type = Shape_Circle;
+   ShapeTemplates[3].Width = 1.0f;
+   ShapeTemplates[3].Height = 1.0f;
+   
+   for (u32 ShapeIndex = 0;
+        ShapeIndex < ShapeCount;
+        ++ShapeIndex)
+   {
+      Shapes[ShapeIndex] = ShapeTemplates[ShapeIndex % ArrayCount(ShapeTemplates)];
+   }
+   
+   f32 Table = CornerAreaTable(ShapeCount, Shapes);
+   f32 Switch = CornerAreaSwitch(ShapeCount, Shapes);
+   f32 SIMD = CornerAreaTableSIMD(ShapeCount, Shapes);
+   f32 SIMD4 = CornerAreaTableSIMD4(ShapeCount, Shapes);
+   
+   printf("Table = %f\n", Table);
+   printf("Switch = %f\n", Switch);
+   printf("SIMD  = %f\n", SIMD );
+   printf("SIMD4 = %f\n", SIMD4);
+   
+#endif
    
    return 0;
 }
