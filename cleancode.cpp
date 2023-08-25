@@ -20,7 +20,7 @@ typedef uint64_t u64;
 #define OS_MAC 1
 #else
 #error missing OS detection
-#endif)
+#endif
 
 //- High precision OS measurement implementations
 #if OS_WINDOWS
@@ -103,7 +103,7 @@ f32 CornerAreaVTBL(u32 ShapeCount, shape_base **Shapes)
    f32 Accum = 0.0f;
    for (u32 ShapeIndex = 0; ShapeIndex < ShapeCount; ++ShapeIndex)
    {
-      Accum += (1.0f / (1.0f + Shapes[ShapeIndex]->CornerCount())) * Shapes[ShapeIndex]->Area(); 
+      Accum += (1.0f / (1.0f + Shapes[ShapeIndex]->CornerCount())) * Shapes[ShapeIndex]->Area();
    }
    
    return Accum;
@@ -487,10 +487,10 @@ f32 MeasureVTBL(f32 (*Function)(u32, shape_base **),
          u32 ShapeType = rand() % 4;
          switch (ShapeType)
          {
-            case 0: { Shapes[ShapeIndex] = new square(rand()); } break; 
-            case 1: { Shapes[ShapeIndex] = new rectangle(rand(), rand()); } break; 
-            case 2: { Shapes[ShapeIndex] = new triangle(rand(), rand()); } break; 
-            case 3: { Shapes[ShapeIndex] = new circle(rand()); } break; 
+            case 0: { Shapes[ShapeIndex] = new square(rand()); } break;
+            case 1: { Shapes[ShapeIndex] = new rectangle(rand(), rand()); } break;
+            case 2: { Shapes[ShapeIndex] = new triangle(rand(), rand()); } break;
+            case 3: { Shapes[ShapeIndex] = new circle(rand()); } break;
             
             default: { assert(false); } break;
          }
