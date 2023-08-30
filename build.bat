@@ -3,6 +3,6 @@
 IF NOT EXIST build mkdir build
 pushd build
 
-cl ../cleancode.cpp -Fecleancode.exe /O2
+cl /O2 /FC ../cleancode.cpp -Fecleancode.exe
 
 popd
